@@ -42,3 +42,7 @@ wrong.
 
 The spec stays at version 1 while changes are additive or clarifying; see its
 [Versions](node-health.md#versions) table. Propose a change with an issue or a pull request.
+
+## License
+
+MIT: see [LICENSE](LICENSE). It covers the spec, the examples and the scripts.
