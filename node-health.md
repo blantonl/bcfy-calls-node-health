@@ -47,6 +47,11 @@ reporting together.
 
 When recording stops, a recorder may send what it has (the window up to then, `final: true`).
 
+When a recorder's reporting starts again while recording goes on (a plugin that sends them
+restarted, say), its nodes' `seq` start again at 0, and a first window that can't say what came
+before has `gap: true`. A window needs some time in it: one that would start where it ends isn't
+sent, and the recorder waits until it has time to report.
+
 ## The report
 
 One JSON object per node, `POST`ed with `Content-Type: application/json`. Sizes are a few hundred
@@ -103,8 +108,8 @@ fed by both has both. [Examples](#examples) shows reports as different recorders
 | `recorder.name` | ✓ | string | The recorder program, lower case: `trunk-recorder-pro`, `trunk-recorder`, `sdrtrunk`, `sdrtrunk-vce`. A fork that measures differently uses a name of its own |
 | `recorder.version` | ✓ | string | Its version |
 | `recorder.upS` | | number | Seconds since recording started |
-| `window.start`, `window.end` | ✓ | number | Unix seconds. Counts are over `[start, end)` |
-| `window.seq` | ✓ | int | Counts up by one per report of this node since the recorder started (0 first). A service seeing it fall knows the recorder restarted |
+| `window.start`, `window.end` | ✓ | number | Unix seconds, `end` after `start`. Counts are over `[start, end)` |
+| `window.seq` | ✓ | int | Counts up by one per report of this node since the recorder (or its reporting) started (0 first). A service seeing it fall knows the recorder, or its reporting, restarted |
 | `window.gap` | | bool | Some time before `start` was never reported (sends failed for over 900 s) |
 | `window.final` | | bool | Recording stopped at `end` |
 | `sites` | ✓ trunked | array | One per site feeding the node |
@@ -210,7 +215,7 @@ lean on what it sees itself as well: which node delivers transmissions the other
 | `400` with `{ "error": "…" }` | The report is wrong: logs it and keeps sending; the window isn't sent again |
 | `401`, `403` | The node's credentials are wrong: says so and stops reporting that node until its settings change |
 | `429`, `503` | Busy, or reports turned off for now: waits as in [When to send](#when-to-send), then carries on. A service pauses every recorder with `503` and `Retry-After` |
-| `404`, `405`, or a `2xx` that isn't a JSON object | The service doesn't take reports: says so once and stops sending to it until recording restarts |
+| `404`, `405`, `410`, or a `2xx` that isn't a JSON object | The service doesn't take reports (or something else answered, such as a proxy's page): says so once and backs off as for `429` without `Retry-After`, up to hourly |
 | Anything else, or no answer | Not delivered: the next report carries the window |
 
 ## For services: reading a report (informative)
@@ -240,7 +245,8 @@ call but delivering fewer than another is wrong somewhere.
 |---|---|
 | Endpoint | `POST https://api.broadcastify.com/call-health`: beside the upload server's `…/call-upload` |
 | `node` | `{ "systemId": 2898, "apiKey": "…" }`: as uploads send them |
-| Nodes | One report per system ID. A recorder system uploaded as one system ID is one node; a site uploaded as a system ID of its own is a node of its own |
+| Nodes | One report per system ID. A recorder system uploaded as one system ID is one node; a site uploaded as a system ID of its own is a node of its own. Sites uploaded as the same system ID are one node: one report with all of them, never one per site |
+| One site per system ID | Broadcastify registers each system ID to one site and records every call it uploads as coming from that site. One system ID uploading several sites (a system's sites with no IDs of their own, one ID given to several sites, or to several recorder systems) labels the other sites' calls as the wrong site: a recorder should warn its user, and keep uploading. One that can't put several recorder systems in one report reports the first |
 | Off | Recorders send reports unless their user turns them off |
 | Use | Today Broadcastify logs the reports and stores them for 30 days; they don't yet change which node's calls are used. Later they may tell node owners about reception problems and help choose between nodes that hear the same site |
 | Limits | One report per node every 50 s (`429` with `Retry-After` otherwise); at most 64 KiB a report |
@@ -250,7 +256,7 @@ call but delivering fewer than another is wrong somewhere.
 
 | Recorder | Where |
 |---|---|
-| Trunk Recorder Pro | [`blantonl/trunk-recorder-pro`](https://github.com/blantonl/trunk-recorder-pro), branch `node-health`: the plugin SDK's `health` module schedules each node and builds its report; the Broadcastify plugin sends it |
+| Trunk Recorder Pro | [`TrunkRecorder/trunk-recorder-pro`](https://github.com/TrunkRecorder/trunk-recorder-pro) 0.3.9 and later: the plugin SDK's `health` module schedules each node and builds its report; the [Broadcastify Calls plugin](https://github.com/TrunkRecorder/trunk-plugin-broadcastify) 0.2.0 and later sends it |
 | SDRTrunk | [`blantonl/sdrtrunk`](https://github.com/blantonl/sdrtrunk), branch `node-health` |
 | SDRTrunk VCE | [`blantonl/sdrtrunk-vce`](https://github.com/blantonl/sdrtrunk-vce), branch `node-health` |
 
@@ -276,3 +282,4 @@ don't change `v`; a change in a field's meaning does.
 |---|---|
 | 2026-11-15 | Still `1`, all additive or clarifying, after reviewing what SDRTrunk and SDRTrunk VCE can measure: what a node's report covers (whole sites, a site in several nodes' reports, several receivers on one site, `receiver`); protocols `mpt1327`, `ltr`, `ltrnet`, `passport`; control message units per protocol, `symbolRate` in baud, rest channels; `cc.syncLossSym`, `cc.merDb`, `voice.*.missing`; `calls.recorded` defined; reasons `data` and `noFrequency`; conventional `noiseDb` optional; the answers a recorder acts on |
 | 2026-11-15 | Still `1`, additive and clarifying: radio `ppmApplied`; `ppmError` said to be measured against the configured correction (as recorders already measured it) |
+| 2026-11-24 | Still `1`, clarifying: sites uploaded as one Broadcastify system ID are one report, never one per site, and one system ID per site (a recorder warns otherwise); `window.end` after `start`, and `seq` and `gap` when reporting restarts while recording goes on; `404`, `405` and `410` back off up to hourly rather than stop (as Trunk Recorder Pro 0.5.0 does); Trunk Recorder Pro's implementation is upstream |
