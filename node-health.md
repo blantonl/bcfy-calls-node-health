@@ -52,6 +52,11 @@ restarted, say), its nodes' `seq` start again at 0, and a first window that can'
 before has `gap: true`. A window needs some time in it: one that would start where it ends isn't
 sent, and the recorder waits until it has time to report.
 
+When a channel restarts (its measurement stops and starts again), a recorder may send what it
+measured up to then at once, in a window shorter than the interval and sometimes inside the
+one-report-every-50-s limit. The `429` that can bring is expected: the recorder waits
+`Retry-After` and carries on. Short windows aren't an error.
+
 ## The report
 
 One JSON object per node, `POST`ed with `Content-Type: application/json`. Sizes are a few hundred
@@ -110,7 +115,7 @@ fed by both has both. [Examples](#examples) shows reports as different recorders
 | `recorder.upS` | | number | Seconds since recording started |
 | `window.start`, `window.end` | ✓ | number | Unix seconds, `end` after `start`. Counts are over `[start, end)` |
 | `window.seq` | ✓ | int | Counts up by one per report of this node since the recorder (or its reporting) started (0 first). A service seeing it fall knows the recorder, or its reporting, restarted |
-| `window.gap` | | bool | Some time before `start` was never reported (sends failed for over 900 s) |
+| `window.gap` | | bool | Some time before `start` was never reported: sends failed for over 900 s, or the time wasn't measured (reporting restarted, or a channel's measurement stopped and started again) |
 | `window.final` | | bool | Recording stopped at `end` |
 | `sites` | ✓ trunked | array | One per site feeding the node |
 | `channels` | ✓ conventional | array | One per channel feeding the node |
@@ -205,7 +210,7 @@ lean on what it sees itself as well: which node delivers transmissions the other
 
 | Field | Meaning |
 |---|---|
-| `nextS` | Send the next report this many seconds after this one (60 to 3600); the phase moves with it |
+| `nextS` | Sets the interval, s (60 to 3600). The next send is the node's next slot at that interval: its phase is kept, not counted from the report just sent. A service leaves it out unless it wants a different interval |
 | `message` | Something for the recorder to show its user ("This node is standby for 12 talkgroups: node 4411 hears Downtown better") |
 | `role` | What the service makes of the node, for display: free-form |
 
@@ -225,7 +230,7 @@ From one report, or several added up:
 | | |
 |---|---|
 | Alive | A report within the last `2 × interval + 60` s, whether or not there were calls |
-| Control channel held | `cc.lockedS / window` |
+| Control channel held | `cc.lockedS / window`. Judge lock by this, not by whether `cc.hz` is there: some recorders in the field leave `cc.hz` out while locked |
 | Control channel decoded | `cc.good / (cc.good + cc.bad)`; with `airSym`, `airSym / (symbolRate × lockedS)`. Recorders count `bad` differently, so compare nodes on `airSym` where both send it |
 | Calls missed | `(noFrequency + noSource + noRecorder) / calls.started` |
 | Voice lost | `voice.bad / voice.frames`, per codec |
@@ -284,3 +289,4 @@ don't change `v`; a change in a field's meaning does.
 | 2026-11-15 | Still `1`, additive and clarifying: radio `ppmApplied`; `ppmError` said to be measured against the configured correction (as recorders already measured it) |
 | 2026-11-22 | Still `1`, clarifying: `systemOffsetMs` comes only from a SYNC_BCST whose time is marked valid (IST clear), as Trunk Recorder Pro already measured it |
 | 2026-11-24 | Still `1`, clarifying: sites uploaded as one Broadcastify system ID are one report, never one per site, and one system ID per site (a recorder warns otherwise); `window.end` after `start`, and `seq` and `gap` when reporting restarts while recording goes on; `404`, `405` and `410` back off up to hourly rather than stop (as Trunk Recorder Pro 0.5.0 does); Trunk Recorder Pro's implementation is upstream |
+| 2026-11-28 | Still `1`, clarifying: `nextS` sets the interval and keeps the node's phase (the service now leaves it out by default); `gap` also marks time that wasn't measured (a channel restarted); short windows after a channel restart are normal; lock is judged by `cc.lockedS`, not by `cc.hz` being there |
