@@ -111,7 +111,8 @@ fed by both has both. [Examples](#examples) shows reports as different recorders
 | `v` | ✓ | int | This format's version: `1` |
 | `node` | ✓ | object | Which node: the service's fields ([bindings](#bindings)) |
 | `recorder.name` | ✓ | string | The recorder program, lower case: `trunk-recorder-pro`, `trunk-recorder`, `sdrtrunk`, `sdrtrunk-vce`. A fork that measures differently uses a name of its own |
-| `recorder.version` | ✓ | string | Its version |
+| `recorder.version` | ✓ | string | Its version. A build with no release number (a nightly) says which build, date and commit: `nightly-20261128-4a00249` |
+| `recorder.reporter` | | string | What builds and sends the report, with its own version, when that isn't the recorder itself (a plugin or add-on that updates separately): `broadcastify 0.2.2` for Trunk Recorder Pro's Broadcastify plugin. At most 64 characters |
 | `recorder.upS` | | number | Seconds since recording started |
 | `window.start`, `window.end` | ✓ | number | Unix seconds, `end` after `start`. Counts are over `[start, end)` |
 | `window.seq` | ✓ | int | Counts up by one per report of this node since the recorder (or its reporting) started (0 first). A service seeing it fall knows the recorder, or its reporting, restarted |
@@ -290,3 +291,4 @@ don't change `v`; a change in a field's meaning does.
 | 2026-11-22 | Still `1`, clarifying: `systemOffsetMs` comes only from a SYNC_BCST whose time is marked valid (IST clear), as Trunk Recorder Pro already measured it |
 | 2026-11-24 | Still `1`, clarifying: sites uploaded as one Broadcastify system ID are one report, never one per site, and one system ID per site (a recorder warns otherwise); `window.end` after `start`, and `seq` and `gap` when reporting restarts while recording goes on; `404`, `405` and `410` back off up to hourly rather than stop (as Trunk Recorder Pro 0.5.0 does); Trunk Recorder Pro's implementation is upstream |
 | 2026-11-28 | Still `1`, clarifying: `nextS` sets the interval and keeps the node's phase (the service now leaves it out by default); `gap` also marks time that wasn't measured (a channel restarted); short windows after a channel restart are normal; lock is judged by `cc.lockedS`, not by `cc.hz` being there |
+| 2026-11-28 | Still `1`, additive: optional `recorder.reporter` (the plugin that sends the report, with its version); a nightly's `recorder.version` says which build |
